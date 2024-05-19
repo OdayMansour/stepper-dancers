@@ -1,5 +1,16 @@
-#include <FlexyStepper.h>
+#include <SpeedyStepper.h>
 
+// Microphone
+const int soundPin = A1;
+
+int min_sound_level = 1024;
+int max_sound_level = 0;
+int sound_level = 0;
+
+float moving_average_sound_level = 0;
+float moving_average_sound_level_weight = 1000;
+
+// Motors
 const int motorx_step_pin = 15;
 const int motorx_direction_pin = 21;
 const int motorx_enable_pin = 14;
@@ -16,17 +27,17 @@ const int motore_step_pin = 1;
 const int motore_direction_pin = 0;
 const int motore_enable_pin = 14;
 
-FlexyStepper stepperx;
-FlexyStepper steppery;
-FlexyStepper stepperz;
-FlexyStepper steppere;
+SpeedyStepper stepperx;
+SpeedyStepper steppery;
+SpeedyStepper stepperz;
+SpeedyStepper steppere;
 
 int stepperx_direction = 1;
 int steppery_direction = 1;
 int stepperz_direction = 1;
 int steppere_direction = 1;
 
-FlexyStepper* stepper;
+SpeedyStepper* stepper;
 
 // Set initial speeds and accelerations
 float initial_speed = 0.01; // Revolutions per second
@@ -108,34 +119,55 @@ void loop() {
   // steppery.setupRelativeMoveInRevolutions(0.2);
   // stepperz.setupRelativeMoveInRevolutions(0.2);
   // steppere.setupRelativeMoveInRevolutions(0.2);
+  
+  // Check sound level
+  min_sound_level = 0;
+  max_sound_level = 0;
 
+  for (int i = 0; i < 5; ++i) {
+    sound_level = analogRead(soundPin);
+    min_sound_level = min(min_sound_level, sound_level);
+    max_sound_level = max(max_sound_level, sound_level);
+  }
+  
+  float delta_level = max_sound_level - min_sound_level;
+  float adjusted_level = max(0, delta_level - 100); // Ignore floor noise level, but don't go negative
+  moving_average_sound_level = (moving_average_sound_level * moving_average_sound_level_weight + adjusted_level) / (moving_average_sound_level_weight + 1.0);
+  float motors_speed = moving_average_sound_level /1.0 + 0.01;
+  // Serial.println(motors_speed);
+  // motors_speed = 200.0;
+  
+  stepperx.setSpeedInRevolutionsPerSecond(motors_speed);
+  steppery.setSpeedInRevolutionsPerSecond(motors_speed);
+  stepperz.setSpeedInRevolutionsPerSecond(motors_speed);
+  steppere.setSpeedInRevolutionsPerSecond(motors_speed);
 
   if (!stepperx.motionComplete()) {
     stepperx.processMovement();
   } else {
     stepperx_direction *= -1;
-    stepperx.setTargetPositionRelativeInRevolutions(stepperx_direction * (random(30)/100.0));
+    stepperx.setupRelativeMoveInRevolutions(stepperx_direction * (random(30)/100.0) * min(1.0, motors_speed));
   }
 
   if (!steppery.motionComplete()) {
     steppery.processMovement();
   } else {
     steppery_direction *= -1;
-    steppery.setTargetPositionRelativeInRevolutions(steppery_direction * (random(30)/100.0));
+    steppery.setupRelativeMoveInRevolutions(steppery_direction * (random(30)/100.0) * min(1.0, motors_speed));
   }
 
   if (!stepperz.motionComplete()) {
     stepperz.processMovement();
   } else {
     stepperz_direction *= -1;
-    stepperz.setTargetPositionRelativeInRevolutions(stepperz_direction * (random(30)/100.0));
+    stepperz.setupRelativeMoveInRevolutions(stepperz_direction * (random(30)/100.0) * min(1.0, motors_speed));
   }
 
   if (!steppere.motionComplete()) {
     steppere.processMovement();
   } else {
     steppere_direction *= -1;
-    steppere.setTargetPositionRelativeInRevolutions(steppere_direction * (random(30)/100.0));
+    steppere.setupRelativeMoveInRevolutions(steppere_direction * (random(30)/100.0) * min(1.0, motors_speed));
   }
 
 }
